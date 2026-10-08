@@ -1,0 +1,43 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ios-src.zip"
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Giải nén mã nguồn iOS
+        run: unzip -q ios-src.zip -d ios-work
+
+      - name: Cài XcodeGen
+        run: brew install xcodegen
+
+      - name: Tạo project Xcode
+        working-directory: ios-work/EditorAI
+        run: xcodegen generate
+
+      - name: Build (không ký)
+        working-directory: ios-work/EditorAI
+        run: |
+          xcodebuild -project EditorAI.xcodeproj -scheme EditorAI \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -n 80
+
+      - name: Đóng gói IPA
+        run: |
+          cd ios-work/EditorAI/build/Build/Products/Release-iphoneos
+          mkdir Payload
+          cp -R EditorAI.app Payload/
+          zip -qr EditorAI.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EditorAI-ipa
+          path: ios-work/EditorAI/build/Build/Products/Release-iphoneos/EditorAI.ipa
